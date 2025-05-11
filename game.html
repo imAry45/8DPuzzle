@@ -1,0 +1,181 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>8-Puzzle Game</title>
+  <style>
+    /* Layout and typography */
+    body {
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      font-family: sans-serif;
+      margin: 20px;
+    }
+    #info {
+      margin-bottom: 10px;
+    }
+    button {
+      margin-left: 10px;
+      padding: 5px 10px;
+      font-size: 1em;
+    }
+
+    /* The 3×3 board uses CSS Grid */
+    .board {
+      position: relative;
+      width: 300px;
+      height: 300px;
+      display: grid;
+      grid-template-columns: repeat(3, 1fr);
+      grid-template-rows: repeat(3, 1fr);
+      gap: 5px;
+      background: #eee;
+    }
+    /* Static target circles (on top of grid, behind tiles) */
+    .target {
+      position: relative;         /* enable z-index */
+      z-index: 1;                 /* behind tiles */
+      border: 2px solid #aaa;
+      border-radius: 50%;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      font-size: 1.2em;
+      color: #aaa;
+      background: transparent;
+    }
+    /* Movable square tiles */
+    .tile {
+      position: absolute;
+      width: 80px;                /* slightly smaller */
+      height: 80px;
+      background: rgba(52,149,219,0.9); /* some transparency */
+      color: white;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      font-size: 1.4em;
+      border-radius: 5px;
+      cursor: pointer;
+      transition: transform 0.2s ease-in-out;
+      z-index: 2;                 /* above targets */
+    }
+  </style>
+</head>
+<body>
+  <div id="info">
+    Moves: <span id="moves">0</span>
+    | Best: <span id="bestScore">-</span>
+    <button id="shuffle">Shuffle</button>
+  </div>
+  <div id="board" class="board"></div>
+
+  <script>
+    // --- Game state ---
+    let board = [1,2,3,4,5,6,7,8,0];  // 0 = empty
+    let moveCount = 0;
+    let bestScore = parseInt(localStorage.getItem('bestScore')) || Infinity;
+
+    // --- Initialization ---
+    function init() {
+      const boardElem = document.getElementById('board');
+      // Draw static target circles
+      for (let i = 0; i < 9; i++) {
+        const t = document.createElement('div');
+        t.className = 'target';
+        t.style.gridRowStart = Math.floor(i/3) + 1;
+        t.style.gridColumnStart = (i % 3) + 1;
+        t.textContent = (i < 8 ? (i+1) : '');
+        boardElem.appendChild(t);
+      }
+      // Create movable tiles
+      board.forEach((val, idx) => {
+        if (val !== 0) {
+          const tile = document.createElement('div');
+          tile.className = 'tile';
+          tile.textContent = val;
+          tile.dataset.val = val;
+          tile.addEventListener('click', () => handleClick(val));
+          boardElem.appendChild(tile);
+        }
+      });
+      // Set best score display
+      document.getElementById('bestScore').textContent = isFinite(bestScore) ? bestScore : '-';
+      updateTiles();
+    }
+
+    // --- Render tiles in their spots ---
+    function updateTiles() {
+      const cellSize = 100;      // cell width/height including gap
+      const offset = 10;         // centering offset = (100 - 80) / 2
+      board.forEach((val, idx) => {
+        if (val !== 0) {
+          const tile = document.querySelector(`.tile[data-val='${val}']`);
+          const row = Math.floor(idx / 3);
+          const col = idx % 3;
+          tile.style.transform = `translate(${col * cellSize + offset}px, ${row * cellSize + offset}px)`;
+        }
+      });
+      document.getElementById('moves').textContent = moveCount;
+    }
+
+    // --- Handle a tile click ---
+    function handleClick(val) {
+      const tileIdx = board.indexOf(+val);
+      const emptyIdx = board.indexOf(0);
+      const r1 = Math.floor(tileIdx / 3), c1 = tileIdx % 3;
+      const r0 = Math.floor(emptyIdx / 3), c0 = emptyIdx % 3;
+      // Check adjacency
+      if (Math.abs(r1 - r0) + Math.abs(c1 - c0) === 1) {
+        // Swap in state
+        [board[tileIdx], board[emptyIdx]] = [board[emptyIdx], board[tileIdx]];
+        moveCount++;
+        updateTiles();
+        checkWin();
+      }
+    }
+
+    // --- Win detection ---
+    function checkWin() {
+      if (board.every((v, i) => v === (i + 1) || (i === 8 && v === 0))) {
+        setTimeout(() => {
+          alert(`You won in ${moveCount} moves!`);
+          if (moveCount < bestScore) {
+            bestScore = moveCount;
+            localStorage.setItem('bestScore', bestScore);
+            document.getElementById('bestScore').textContent = bestScore;
+            alert('New best score!');
+          }
+        }, 100);
+      }
+    }
+
+    // --- Shuffle into a solvable puzzle ---
+    function shuffle() {
+      do {
+        board = board.sort(() => Math.random() - 0.5);
+      } while (!isSolvable(board) || isSolved(board));
+      moveCount = 0;
+      updateTiles();
+    }
+    function isSolvable(arr) {
+      let inv = 0;
+      for (let i = 0; i < 9; i++) {
+        for (let j = i + 1; j < 9; j++) {
+          if (arr[i] && arr[j] && arr[i] > arr[j]) inv++;
+        }
+      }
+      return inv % 2 === 0;
+    }
+    function isSolved(arr) {
+      return arr.every((v, i) => v === (i + 1) || (i === 8 && v === 0));
+    }
+
+    // --- Event listeners ---
+    document.getElementById('shuffle').addEventListener('click', shuffle);
+    window.onload = init;
+  </script>
+</body>
+</html>
